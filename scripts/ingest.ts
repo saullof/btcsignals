@@ -13,6 +13,8 @@ import {
   votes as votesOf,
   decile,
   futureReturns,
+  compositeAlertZone,
+  consensusLevel,
 } from '../src/lib/signals.ts'
 import { indicatorName, signalLabel } from '../src/lib/ui.ts'
 import type { Signal } from '../src/lib/types.ts'
@@ -224,19 +226,37 @@ async function main() {
     source: x.source,
   }))
 
-  // ── Viradas de estado: compara o dia mais recente com o anterior.
-  const prev = dates[dates.length - 2]
-  const prevSig = new Map(indsByDate.get(prev)!.map((x) => [x.key, x.signal]))
+  // ── Alertas (viradas): compara o dia mais recente com o anterior.
+  const prevInds = indsByDate.get(dates[dates.length - 2])!
   const events: any[] = []
+
+  // (a) Flip individual de cada indicador (banda 0.85/0.15).
+  const prevSig = new Map(prevInds.map((x) => [x.key, x.signal]))
   for (const x of latestInds) {
     const old = prevSig.get(x.key)
     if (old && old !== x.signal)
       events.push({ date: latest, scope: 'indicator', key: x.key, old_signal: old, new_signal: x.signal })
   }
-  const compSigNow = signalFromCheapness(compByDate[compByDate.length - 1])
-  const compSigPrev = signalFromCheapness(compByDate[compByDate.length - 2])
-  if (compSigNow !== compSigPrev)
-    events.push({ date: latest, scope: 'composite', key: 'composite', old_signal: compSigPrev, new_signal: compSigNow })
+
+  // (b) Composto cruzando 0.65 (compra) / 0.35 (venda).
+  const zNow = compositeAlertZone(compByDate[compByDate.length - 1])
+  const zPrev = compositeAlertZone(compByDate[compByDate.length - 2])
+  if (zNow !== zPrev && zNow !== 'mid')
+    events.push({ date: latest, scope: 'composite', key: 'composite', old_signal: zPrev, new_signal: zNow })
+
+  // (c) Consenso máximo: 5+ indicadores no mesmo lado.
+  const cNow = consensusLevel(
+    latestInds.filter((x) => x.signal === 'buy').length,
+    latestInds.filter((x) => x.signal === 'sell').length,
+  )
+  const cPrev = consensusLevel(
+    prevInds.filter((x) => x.signal === 'buy').length,
+    prevInds.filter((x) => x.signal === 'sell').length,
+  )
+  if (cNow !== cPrev && cNow !== 'none')
+    events.push({ date: latest, scope: 'consensus', key: 'consensus', old_signal: cPrev, new_signal: cNow })
+
+  const compSigNow = signalFromCheapness(compByDate[compByDate.length - 1]) // só p/ o log
 
   // ── Gravar tudo.
   console.log('Gravando…')
@@ -256,16 +276,24 @@ async function main() {
   )
 }
 
-// Frase curta pro corpo da notificação. Consolida várias viradas num push só.
-function summarizeEvents(events: { scope: string; key: string; new_signal: string }[]): string {
-  if (events.length === 1) {
-    const e = events[0]
-    const name = e.scope === 'composite' ? 'Composto' : (indicatorName[e.key] ?? e.key)
-    return `${name} entrou em ${signalLabel[e.new_signal as Signal]}`
-  }
-  const buy = events.filter((e) => e.new_signal === 'buy').length
-  const sell = events.filter((e) => e.new_signal === 'sell').length
-  return `${events.length} sinais mudaram — ${buy} compra, ${sell} venda`
+type Event = { scope: string; key: string; new_signal: string }
+
+// Descreve uma virada em português.
+function describeEvent(e: Event): string {
+  const side = signalLabel[e.new_signal as Signal] // COMPRA/VENDA
+  if (e.scope === 'consensus') return `🔥 Alerta máximo: 5+ indicadores em ${side}`
+  if (e.scope === 'composite')
+    return `Composto entrou em zona de ${side} (${e.new_signal === 'buy' ? '≥0.65' : '≤0.35'})`
+  return `${indicatorName[e.key] ?? e.key} entrou em ${side}`
+}
+
+// Corpo do push: descreve a virada mais forte (consenso > composto > indicador),
+// consolidando as demais num "+N".
+function summarizeEvents(events: Event[]): string {
+  const rank: Record<string, number> = { consensus: 0, composite: 1, indicator: 2 }
+  const sorted = [...events].sort((a, b) => (rank[a.scope] ?? 9) - (rank[b.scope] ?? 9))
+  const top = describeEvent(sorted[0])
+  return sorted.length > 1 ? `${top} (+${sorted.length - 1})` : top
 }
 
 // Envia Web Push só nas viradas, pra cada inscrição ativa. Marca inativa a que
@@ -288,7 +316,11 @@ async function sendPush(events: { scope: string; key: string; new_signal: string
   let sent = 0
   for (const s of subs) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+      // urgency high: pede entrega imediata (iOS ainda pode atrasar, mas ajuda).
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, {
+        urgency: 'high',
+        TTL: 3600,
+      })
       sent++
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode

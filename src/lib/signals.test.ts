@@ -9,6 +9,8 @@ import {
   decile,
   baseRateForBucket,
   futureReturns,
+  compositeAlertZone,
+  consensusLevel,
 } from './signals.ts'
 
 test('percentile: fração <= value', () => {
@@ -61,6 +63,20 @@ test('futureReturns: ignora dias sem futuro', () => {
   assert.ok(Math.abs(r[0]! - 0.1) < 1e-9)
   assert.ok(Math.abs(r[1]! - 0.1) < 1e-9)
   assert.equal(r[2], null)
+})
+
+test('compositeAlertZone: 0.65 compra / 0.35 venda', () => {
+  assert.equal(compositeAlertZone(0.7), 'buy')
+  assert.equal(compositeAlertZone(0.65), 'buy') // limite inclusivo
+  assert.equal(compositeAlertZone(0.5), 'mid')
+  assert.equal(compositeAlertZone(0.35), 'sell')
+  assert.equal(compositeAlertZone(0.2), 'sell')
+})
+
+test('consensusLevel: 5+ do mesmo lado', () => {
+  assert.equal(consensusLevel(5, 0), 'buy')
+  assert.equal(consensusLevel(0, 6), 'sell')
+  assert.equal(consensusLevel(4, 4), 'none')
 })
 
 test('baseRateForBucket: prob e N da faixa atual', () => {

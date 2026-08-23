@@ -21,7 +21,10 @@ const payload = JSON.stringify({
 let sent = 0
 for (const s of subs) {
   try {
-    await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+    await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, {
+      urgency: 'high',
+      TTL: 3600,
+    })
     sent++
   } catch (e) {
     const code = (e as { statusCode?: number }).statusCode

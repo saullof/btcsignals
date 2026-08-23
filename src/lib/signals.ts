@@ -87,6 +87,20 @@ export function futureReturns(closes: number[], horizon: number): (number | null
   })
 }
 
+// Zona de alerta do composto: compra ao cruzar buyAt (0.65), venda em sellAt (0.35).
+export function compositeAlertZone(c: number, buyAt = 0.65, sellAt = 0.35): 'buy' | 'sell' | 'mid' {
+  if (c >= buyAt) return 'buy'
+  if (c <= sellAt) return 'sell'
+  return 'mid'
+}
+
+// Consenso máximo: 5+ indicadores do mesmo lado.
+export function consensusLevel(buyCount: number, sellCount: number, min = 5): 'buy' | 'sell' | 'none' {
+  if (buyCount >= min) return 'buy'
+  if (sellCount >= min) return 'sell'
+  return 'none'
+}
+
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n))
 }
