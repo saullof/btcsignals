@@ -12,11 +12,11 @@ export type IndicatorSnapshot = {
 
 export type ConsensusRate = { prob: number | null; n: number }
 export type Consensus = {
-  buy: number
   total: number
-  buyFrac: number
-  today: Record<string, ConsensusRate> // '30' | '90' | '180'
-  curve90: { thr: number; prob: number | null; n: number }[]
+  buy: number
+  sell: number
+  buy50: ConsensusRate // ≥50% em compra → freq. de alta em 90d
+  sell50: ConsensusRate // ≥50% em venda → freq. de queda em 90d
 }
 
 export type CompositeSnapshot = {

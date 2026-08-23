@@ -53,6 +53,27 @@ export const fmtUsd = (n: number) =>
 export const pct = (n: number | null | undefined) =>
   n == null ? '—' : `${Math.round(n * 100)}%`
 
+// Traduz o composto (0..1) numa zona em português comum.
+export function zonaFromComposite(c: number): { label: string; tone: Signal } {
+  if (c >= 0.75) return { label: 'muito barato (fundo de ciclo)', tone: 'buy' }
+  if (c >= 0.6) return { label: 'barato', tone: 'buy' }
+  if (c >= 0.4) return { label: 'neutro (meio-termo)', tone: 'neutral' }
+  if (c >= 0.25) return { label: 'caro', tone: 'sell' }
+  return { label: 'muito caro (topo de ciclo)', tone: 'sell' }
+}
+
+// Traduz uma probabilidade histórica numa frase.
+export function probPhrase(p: number | null): string {
+  if (p == null) return 'sem dados suficientes'
+  if (p >= 0.7) return 'tendência forte de alta'
+  if (p >= 0.58) return 'leve viés de alta'
+  if (p >= 0.42) return 'quase um cara-ou-coroa'
+  if (p >= 0.3) return 'leve viés de baixa'
+  return 'tendência de baixa'
+}
+
+export const toneEmoji: Record<Signal, string> = { buy: '🟢', sell: '🔴', neutral: '🟡' }
+
 // Arredonda sem lixo de float; até 2 casas.
 export const fmtRaw = (n: number | null | undefined) =>
   n == null ? '—' : (Math.round(n * 100) / 100).toString()

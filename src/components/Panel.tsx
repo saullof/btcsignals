@@ -10,7 +10,11 @@ import {
   indicatorDesc,
   pct,
   fmtRaw,
+  zonaFromComposite,
+  probPhrase,
+  toneEmoji,
 } from '../lib/ui'
+import type { ConsensusRate } from '../lib/types'
 
 export default function Panel() {
   const [composite, setComposite] = useState<CompositeSnapshot | null>(null)
@@ -52,6 +56,9 @@ export default function Panel() {
 
   return (
     <div className="flex flex-col gap-4 pt-1">
+      {/* Resumo em uma frase — a tradução de tudo em português comum */}
+      <Resumo c={c} />
+
       {/* Hero: gauge do composto + sinal */}
       <section className="card flex flex-col items-center px-4 pt-5 pb-4">
         <div className="flex w-full items-center justify-between text-xs" style={{ color: 'var(--muted)' }}>
@@ -122,8 +129,8 @@ const EXPLAIN = {
     body: 'Pega a nota (composto) de hoje e procura, no histórico desde 2011, todos os dias que tinham nota parecida.\n\nNesses dias, conta em quantos o preço estava MAIS ALTO 30, 90 e 180 dias depois. Esse percentual é a "chance de subir".\n\nn = quantos dias parecidos existiram (quanto maior, mais confiável).\n\nNÃO é previsão. É só a frequência do que já aconteceu em situações parecidas.',
   },
   consenso: {
-    title: 'Consenso de compra',
-    body: 'Outra forma de olhar. Em vez da média (composto), conta QUANTOS dos 10 indicadores dizem "compra" ao mesmo tempo.\n\nA ideia: será que quando muitos concordam, a chance melhora? A curva mostra que, no passado, quando ≥30%, ≥50% ou ≥70% estavam em compra, o preço subiu em 90 dias em ~65-67% — quase igual. Ou seja: concordância não é garantia.\n\nHoje isso mede só COMPRA (não venda).',
+    title: 'Consenso dos indicadores',
+    body: 'Em vez da média (composto), olha QUANTOS dos 10 indicadores apontam o mesmo lado ao mesmo tempo.\n\n🟢 Compra: nos dias em que metade ou mais diziam "compra", em quantos o preço estava MAIS ALTO 90 dias depois.\n\n🔴 Venda: nos dias em que metade ou mais diziam "venda", em quantos o preço estava MAIS BAIXO 90 dias depois.\n\nA ideia é ver se, quando muitos concordam, o resultado seguinte foi mais previsível. Amostra pequena; não é garantia nem conselho.',
   },
 }
 
@@ -281,39 +288,83 @@ function Sheet({ ind, onClose }: { ind: IndicatorSnapshot; onClose: () => void }
   )
 }
 
+function Resumo({ c }: { c: CompositeSnapshot }) {
+  const cv = c.composite ?? 0
+  const z = zonaFromComposite(cv)
+  const total = c.votes_buy + c.votes_sell + c.votes_neutral
+  const concl =
+    z.tone === 'buy'
+      ? 'Zonas assim, no passado, estiveram mais perto de fundos de ciclo.'
+      : z.tone === 'sell'
+        ? 'Zonas assim, no passado, estiveram mais perto de topos de ciclo.'
+        : 'Sem sinal claro para nenhum dos lados no momento.'
+  return (
+    <section className="card px-4 py-4">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">{toneEmoji[z.tone]}</span>
+        <p className="text-sm font-bold">Resumo de hoje</p>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed">
+        O mercado está em zona <b style={{ color: signalColor[z.tone] }}>{z.label}</b>. Dos {total}{' '}
+        indicadores, <b style={{ color: 'var(--buy)' }}>{c.votes_buy} em compra</b>,{' '}
+        <b style={{ color: 'var(--sell)' }}>{c.votes_sell} em venda</b> e {c.votes_neutral} indecisos.
+        Em situações parecidas, o preço estava mais alto em <b>{pct(c.prob_up_30d)}</b> das vezes um
+        mês depois ({probPhrase(c.prob_up_30d)}). {concl}
+      </p>
+    </section>
+  )
+}
+
 function ConsensusCard({ cons, onHelp }: { cons: Consensus; onHelp: () => void }) {
   return (
     <section className="card px-4 py-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">Consenso de compra</p>
+        <p className="text-sm font-semibold">Consenso dos indicadores</p>
         <HelpBtn onClick={onHelp} />
       </div>
       <p className="mt-1 text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-        Hoje <b style={{ color: 'var(--text)' }}>{cons.buy} de {cons.total}</b> indicadores dizem compra.
-        No passado, quando esta fração de indicadores estava em compra, o preço subiu em 90 dias:
+        No passado, quando <b style={{ color: 'var(--text)' }}>metade ou mais</b> dos {cons.total}{' '}
+        indicadores apontavam o mesmo lado, o que aconteceu em 90 dias:
       </p>
-      <div className="mt-3 flex flex-col gap-2">
-        {cons.curve90.map((r) => (
-          <div key={r.thr} className="flex items-center gap-2">
-            <span className="w-14 text-[11px] tabular" style={{ color: 'var(--muted)' }}>
-              ≥{Math.round(r.thr * 100)}%
-            </span>
-            <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--border)' }}>
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${Math.round((r.prob ?? 0) * 100)}%`, background: 'var(--buy)' }}
-              />
-            </div>
-            <span className="w-20 text-right text-[11px] tabular">
-              {pct(r.prob)} <span style={{ color: 'var(--muted)' }}>n={r.n}</span>
-            </span>
-          </div>
-        ))}
+      <div className="mt-3 flex flex-col gap-3">
+        <ConsRow emoji="🟢" label={`Compra — hoje ${cons.buy}/${cons.total}`} verb="subiu" rate={cons.buy50} color="var(--buy)" />
+        <ConsRow emoji="🔴" label={`Venda — hoje ${cons.sell}/${cons.total}`} verb="caiu" rate={cons.sell50} color="var(--sell)" />
       </div>
       <p className="mt-2 text-[10px] leading-snug" style={{ color: 'var(--muted)' }}>
-        ≥50% = pelo menos metade dos indicadores em compra. Amostra pequena; não é conselho financeiro.
+        Amostra pequena (poucos ciclos); não é conselho financeiro.
       </p>
     </section>
+  )
+}
+
+function ConsRow({
+  emoji,
+  label,
+  verb,
+  rate,
+  color,
+}: {
+  emoji: string
+  label: string
+  verb: string
+  rate: ConsensusRate
+  color: string
+}) {
+  return (
+    <div className="rounded-xl px-3 py-2" style={{ background: 'var(--bg-2)' }}>
+      <div className="flex items-center justify-between text-[13px]">
+        <span className="flex items-center gap-1.5 font-medium">
+          <span>{emoji}</span>
+          {label}
+        </span>
+        <span className="tabular text-base font-bold" style={{ color }}>
+          {pct(rate.prob)}
+        </span>
+      </div>
+      <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+        o preço {verb} em 90 dias (n={rate.n})
+      </p>
+    </div>
   )
 }
 

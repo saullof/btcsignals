@@ -159,35 +159,35 @@ async function main() {
     bucketStats[h] = perDecile.map((b) => ({ probUp: b.n ? b.up / b.n : null, n: b.n }))
   }
 
-  // ── Base-rate por CONSENSO: fração de indicadores em compra por dia.
-  // "Quando pelo menos X% concordaram em compra, com que frequência subiu?"
-  const buyFrac = dates.map((d) => {
-    const inds = indsByDate.get(d)!
-    const buy = inds.filter((x) => x.signal === 'buy').length
-    return inds.length ? buy / inds.length : 0
-  })
-  const consAt = (thr: number, h: number) => {
-    let up = 0
+  // ── Base-rate por CONSENSO (compra E venda): quando metade+ dos indicadores
+  // apontava o mesmo lado, com que frequência o preço subiu/caiu em 90 dias?
+  const fracBy = (sig: Signal) =>
+    dates.map((d) => {
+      const inds = indsByDate.get(d)!
+      const k = inds.filter((x) => x.signal === sig).length
+      return inds.length ? k / inds.length : 0
+    })
+  const buyFrac = fracBy('buy')
+  const sellFrac = fracBy('sell')
+  const rate = (frac: number[], thr: number, h: number, wantUp: boolean) => {
+    let hit = 0
     let n = 0
     for (let i = 0; i < dates.length; i++) {
-      if (buyFrac[i] >= thr && retsByH[h][i] != null) {
+      const r = retsByH[h][i]
+      if (frac[i] >= thr && r != null) {
         n++
-        if (retsByH[h][i]! > 0) up++
+        if (wantUp ? r > 0 : r < 0) hit++
       }
     }
-    return { prob: n ? up / n : null, n }
+    return { prob: n ? hit / n : null, n }
   }
   const lastInds = indsByDate.get(dates[dates.length - 1])!
-  const buyNow = lastInds.filter((x) => x.signal === 'buy').length
-  const fracNow = buyFrac[buyFrac.length - 1]
   const consensus = {
-    buy: buyNow,
     total: lastInds.length,
-    buyFrac: fracNow,
-    // Leitura de hoje: dias tão ou mais "comprados" que hoje.
-    today: { 30: consAt(fracNow, 30), 90: consAt(fracNow, 90), 180: consAt(fracNow, 180) },
-    // Curva didática (90d): quanto mais indicadores concordam, historicamente…
-    curve90: [0.3, 0.5, 0.7].map((thr) => ({ thr, ...consAt(thr, 90) })),
+    buy: lastInds.filter((x) => x.signal === 'buy').length,
+    sell: lastInds.filter((x) => x.signal === 'sell').length,
+    buy50: rate(buyFrac, 0.5, 90, true), // ≥50% em compra → subiu em 90d
+    sell50: rate(sellFrac, 0.5, 90, false), // ≥50% em venda → caiu em 90d
   }
 
   // ── Linhas do composite_snapshots (histórico inteiro).
