@@ -27,7 +27,7 @@ export default function App() {
             <h1 className="text-base font-bold">BTC Cycle Signals</h1>
           </div>
           <p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>
-            Apoio à decisão — não é conselho financeiro
+            Painel BTC - Saulo Fernandes
           </p>
         </div>
         {ticker && (
