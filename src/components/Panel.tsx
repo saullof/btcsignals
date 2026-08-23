@@ -90,8 +90,8 @@ export default function Panel() {
           <Prob label="180 dias" p={c.prob_up_180d} n={c.sample_180d} />
         </div>
         <p className="mt-3 text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-          <b>casos</b> = quantos dias do histórico (desde 2011) tinham nota parecida com a de hoje.
-          Quanto mais casos, mais confiável o número. ⚠ Frequência histórica, <b>não</b> é previsão
+          <b>dias</b> = quantos dias do histórico (desde 2011) tinham nota parecida com a de hoje.
+          Quanto mais dias, mais confiável o número. ⚠ Frequência histórica, <b>não</b> é previsão
           nem conselho financeiro.
         </p>
       </section>
@@ -212,7 +212,7 @@ function Prob({ label, p, n }: { label: string; p: number | null; n: number | nu
         {label}
       </div>
       <div className="text-[11px] tabular" style={{ color: 'var(--muted)' }}>
-        {n ?? 0} casos
+        {n ?? 0} dias
       </div>
     </div>
   )
@@ -362,7 +362,7 @@ function ConsRow({
         </span>
       </div>
       <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
-        o preço {verb} em 90 dias — em {rate.n} casos parecidos do passado
+        o preço {verb} em 90 dias — em {rate.n} dias parecidos do passado
       </p>
     </div>
   )
