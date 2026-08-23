@@ -10,6 +10,15 @@ export type IndicatorSnapshot = {
   source: string | null
 }
 
+export type ConsensusRate = { prob: number | null; n: number }
+export type Consensus = {
+  buy: number
+  total: number
+  buyFrac: number
+  today: Record<string, ConsensusRate> // '30' | '90' | '180'
+  curve90: { thr: number; prob: number | null; n: number }[]
+}
+
 export type CompositeSnapshot = {
   date: string
   composite: number | null
@@ -22,6 +31,7 @@ export type CompositeSnapshot = {
   sample_30d: number | null
   sample_90d: number | null
   sample_180d: number | null
+  consensus?: Consensus | null
 }
 
 export type PricePoint = { date: string; close: number }

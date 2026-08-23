@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { signalFromCheapness } from '../lib/signals'
-import type { CompositeSnapshot, IndicatorSnapshot, Signal } from '../lib/types'
-import { signalColor, signalLabel, signalTint, indicatorName, pct, fmtRaw } from '../lib/ui'
+import type { CompositeSnapshot, Consensus, IndicatorSnapshot, Signal } from '../lib/types'
+import {
+  signalColor,
+  signalLabel,
+  signalTint,
+  indicatorName,
+  indicatorDesc,
+  pct,
+  fmtRaw,
+} from '../lib/ui'
 
 export default function Panel() {
   const [composite, setComposite] = useState<CompositeSnapshot | null>(null)
   const [indicators, setIndicators] = useState<IndicatorSnapshot[]>([])
   const [state, setState] = useState<'loading' | 'empty' | 'ready' | 'no-db'>('loading')
+  const [sel, setSel] = useState<IndicatorSnapshot | null>(null)
 
   useEffect(() => {
     if (!supabase) {
@@ -50,12 +59,17 @@ export default function Panel() {
         </div>
         <Gauge value={cValue} signal={cSignal} />
         <VotesBar buy={c.votes_buy} sell={c.votes_sell} neutral={c.votes_neutral} />
+        <p className="mt-3 text-center text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
+          Média de todos os indicadores numa nota de <b>0 (caro/topo)</b> a <b>1 (barato/fundo)</b>.
+        </p>
       </section>
 
-      {/* Probabilidade (base-rates) — sempre com N */}
+      {/* Probabilidade (base-rates) */}
       <section className="card px-4 py-4">
-        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          A partir deste estado, historicamente subiu:
+        <p className="text-sm font-semibold">Chance histórica de subir</p>
+        <p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+          Em dias do passado com o composto na mesma faixa de hoje, com que frequência o preço estava
+          mais alto depois:
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Prob label="30 dias" p={c.prob_up_30d} n={c.sample_30d} />
@@ -63,22 +77,29 @@ export default function Panel() {
           <Prob label="180 dias" p={c.prob_up_180d} n={c.sample_180d} />
         </div>
         <p className="mt-3 text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-          ⚠ Frequência histórica de amostra pequena (poucos ciclos). Não é previsão nem conselho financeiro.
+          <b>n</b> = quantos dias do histórico (desde 2011) caíram nessa mesma faixa. Quanto maior o
+          n, mais confiável o número. ⚠ Frequência histórica, <b>não</b> é previsão nem conselho
+          financeiro.
         </p>
       </section>
+
+      {/* Base-rate por consenso */}
+      {c.consensus && <ConsensusCard cons={c.consensus} />}
 
       {/* Grade de indicadores */}
       <div className="flex items-center justify-between px-1">
         <h2 className="text-sm font-semibold">Indicadores</h2>
         <span className="text-xs" style={{ color: 'var(--muted)' }}>
-          {indicators.length} sinais
+          toque para explicar
         </span>
       </div>
       <section className="grid grid-cols-2 gap-3">
         {indicators.map((i) => (
-          <IndicatorCard key={i.indicator_key} ind={i} />
+          <IndicatorCard key={i.indicator_key} ind={i} onClick={() => setSel(i)} />
         ))}
       </section>
+
+      {sel && <Sheet ind={sel} onClose={() => setSel(null)} />}
     </div>
   )
 }
@@ -167,11 +188,11 @@ function Prob({ label, p, n }: { label: string; p: number | null; n: number | nu
   )
 }
 
-function IndicatorCard({ ind }: { ind: IndicatorSnapshot }) {
-  const cheap = ind.cheapness ?? 0
+function IndicatorCard({ ind, onClick }: { ind: IndicatorSnapshot; onClick: () => void }) {
+  const barganha = ind.cheapness ?? 0
   const color = signalColor[ind.signal]
   return (
-    <div className="card p-3">
+    <button onClick={onClick} className="card p-3 text-left">
       <div className="flex items-start justify-between gap-2">
         <span className="text-[13px] font-semibold leading-tight">
           {indicatorName[ind.indicator_key] ?? ind.indicator_key}
@@ -186,14 +207,87 @@ function IndicatorCard({ ind }: { ind: IndicatorSnapshot }) {
           {fmtRaw(ind.raw_value)}
         </span>
       </div>
-      {/* barra de cheapness (0 = venda, 1 = compra) */}
+      {/* barra "barganha": 0 = caro/topo, 1 = barato/fundo */}
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--border)' }}>
-        <div className="h-full rounded-full" style={{ width: `${Math.round(cheap * 100)}%`, background: color }} />
+        <div className="h-full rounded-full" style={{ width: `${Math.round(barganha * 100)}%`, background: color }} />
       </div>
-      <div className="mt-1 text-[10px]" style={{ color: 'var(--muted)' }}>
-        cheapness {pct(cheap)}
+      <div className="mt-1 flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
+        <span>caro</span>
+        <span>barganha {pct(barganha)}</span>
+        <span>barato</span>
+      </div>
+    </button>
+  )
+}
+
+// Bottom sheet com a explicação do indicador tocado.
+function Sheet({ ind, onClose }: { ind: IndicatorSnapshot; onClose: () => void }) {
+  const color = signalColor[ind.signal]
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
+      <div
+        className="card relative mx-3 mb-3 w-full max-w-md px-5 pt-4 pb-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full" style={{ background: 'var(--border)' }} />
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold">{indicatorName[ind.indicator_key] ?? ind.indicator_key}</h3>
+          <span className="chip px-2.5 py-1 text-[11px]" style={{ background: signalTint[ind.signal], color }}>
+            {signalLabel[ind.signal]}
+          </span>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+          {indicatorDesc[ind.indicator_key] ?? 'Sem descrição.'}
+        </p>
+        <div className="mt-4 flex justify-between text-xs" style={{ color: 'var(--muted)' }}>
+          <span>
+            barganha agora: <b style={{ color }}>{pct(ind.cheapness)}</b>
+          </span>
+          <span>valor: {fmtRaw(ind.raw_value)}</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-xl py-2.5 text-sm font-semibold"
+          style={{ background: 'var(--card-hi)', color: 'var(--text)', border: '1px solid var(--border)' }}
+        >
+          Fechar
+        </button>
       </div>
     </div>
+  )
+}
+
+function ConsensusCard({ cons }: { cons: Consensus }) {
+  return (
+    <section className="card px-4 py-4">
+      <p className="text-sm font-semibold">Consenso de compra</p>
+      <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
+        Hoje: <b style={{ color: 'var(--text)' }}>{cons.buy} de {cons.total}</b> indicadores em compra.
+        Quanto mais concordaram no passado, maior a frequência de alta em 90 dias:
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        {cons.curve90.map((r) => (
+          <div key={r.thr} className="flex items-center gap-2">
+            <span className="w-14 text-[11px] tabular" style={{ color: 'var(--muted)' }}>
+              ≥{Math.round(r.thr * 100)}%
+            </span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--border)' }}>
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${Math.round((r.prob ?? 0) * 100)}%`, background: 'var(--buy)' }}
+              />
+            </div>
+            <span className="w-20 text-right text-[11px] tabular">
+              {pct(r.prob)} <span style={{ color: 'var(--muted)' }}>n={r.n}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] leading-snug" style={{ color: 'var(--muted)' }}>
+        ≥50% = pelo menos metade dos indicadores em compra. Amostra pequena; não é conselho financeiro.
+      </p>
+    </section>
   )
 }
 
@@ -205,7 +299,7 @@ function Notice({ text }: { text: string }) {
   )
 }
 
-// Ordena: sinais de compra primeiro, depois venda, depois neutro; cheap desc.
+// Ordena: sinais de compra primeiro, depois venda, depois neutro; barganha desc.
 function sortInds(inds: IndicatorSnapshot[]): IndicatorSnapshot[] {
   const rank: Record<Signal, number> = { buy: 0, sell: 1, neutral: 2 }
   return [...inds].sort(

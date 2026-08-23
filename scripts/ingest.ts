@@ -143,18 +143,51 @@ async function main() {
   // ── Base-rates (§7): retornos futuros do CBBI Price, por decil do composto.
   const closes = dates.map((d) => cbbiPrice.get(d)!)
   const horizons = [30, 90, 180] as const
+  const retsByH: Record<number, (number | null)[]> = {}
+  for (const h of horizons) retsByH[h] = futureReturns(closes, h)
+
   // Estatística por decil e horizonte: {probUp, n}. Calcula 1x, evita O(n²).
   const bucketStats: Record<number, { probUp: number | null; n: number }[]> = {}
   for (const h of horizons) {
-    const rets = futureReturns(closes, h)
     const perDecile = Array.from({ length: 10 }, () => ({ up: 0, n: 0 }))
     for (let i = 0; i < dates.length; i++) {
-      if (rets[i] == null) continue
+      if (retsByH[h][i] == null) continue
       const b = perDecile[decile(compByDate[i])]
       b.n++
-      if (rets[i]! > 0) b.up++
+      if (retsByH[h][i]! > 0) b.up++
     }
     bucketStats[h] = perDecile.map((b) => ({ probUp: b.n ? b.up / b.n : null, n: b.n }))
+  }
+
+  // ── Base-rate por CONSENSO: fração de indicadores em compra por dia.
+  // "Quando pelo menos X% concordaram em compra, com que frequência subiu?"
+  const buyFrac = dates.map((d) => {
+    const inds = indsByDate.get(d)!
+    const buy = inds.filter((x) => x.signal === 'buy').length
+    return inds.length ? buy / inds.length : 0
+  })
+  const consAt = (thr: number, h: number) => {
+    let up = 0
+    let n = 0
+    for (let i = 0; i < dates.length; i++) {
+      if (buyFrac[i] >= thr && retsByH[h][i] != null) {
+        n++
+        if (retsByH[h][i]! > 0) up++
+      }
+    }
+    return { prob: n ? up / n : null, n }
+  }
+  const lastInds = indsByDate.get(dates[dates.length - 1])!
+  const buyNow = lastInds.filter((x) => x.signal === 'buy').length
+  const fracNow = buyFrac[buyFrac.length - 1]
+  const consensus = {
+    buy: buyNow,
+    total: lastInds.length,
+    buyFrac: fracNow,
+    // Leitura de hoje: dias tão ou mais "comprados" que hoje.
+    today: { 30: consAt(fracNow, 30), 90: consAt(fracNow, 90), 180: consAt(fracNow, 180) },
+    // Curva didática (90d): quanto mais indicadores concordam, historicamente…
+    curve90: [0.3, 0.5, 0.7].map((thr) => ({ thr, ...consAt(thr, 90) })),
   }
 
   // ── Linhas do composite_snapshots (histórico inteiro).
@@ -174,6 +207,8 @@ async function main() {
       sample_180d: bucketStats[180][d].n,
     }
   })
+  // Só o dia mais recente carrega a base-rate por consenso (a UI lê daqui).
+  ;(compRows[compRows.length - 1] as { consensus?: unknown }).consensus = consensus
 
   // ── Indicadores do dia mais recente (grade da UI).
   const latest = dates[dates.length - 1]

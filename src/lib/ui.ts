@@ -19,6 +19,20 @@ export const signalTint: Record<Signal, string> = {
   neutral: 'rgba(107,118,136,0.14)',
 }
 
+// Explicação em português simples: o que mede + o que compra/venda significa.
+export const indicatorDesc: Record<string, string> = {
+  mvrv: 'Compara o preço atual com o preço médio que todos pagaram pelas moedas. Muito acima = mercado esticado (topo); perto ou abaixo = fundo. Verde quando bem baixo.',
+  puell: 'Mede quanto os mineradores estão faturando vs a média de 1 ano. Faturamento altíssimo marcou topos; capitulação marcou fundos.',
+  rhodl: 'Compara moedas movidas há pouco com moedas paradas há anos. Picos historicamente coincidiram com topos de ciclo.',
+  rupl: 'Lucro ou prejuízo "no papel" da rede inteira — quão no lucro o mercado está. Euforia (quase todos no lucro) = topo; capitulação = fundo. É o parente do seu "% no lucro".',
+  reserve_risk: 'Confiança dos holders de longo prazo em relação ao preço. Baixo = boa relação risco/retorno para acumular.',
+  pi_cycle: 'Cruzamento de médias móveis que, no passado, marcou topos de ciclo com boa precisão.',
+  '2y_ma': 'Preço dividido pela média móvel de 2 anos. Abaixo da média = zona histórica de compra; muito acima = zona de venda.',
+  cbbi: 'Índice que junta ~9 métricas num só número (0–100) de "quão perto do topo estamos". Entra como um composto independente.',
+  fng: 'Termômetro de sentimento (0–100). É contrário: medo extremo costuma ser compra; ganância extrema, venda.',
+  mayer: 'Preço dividido pela média de 200 dias. Abaixo de 0,8 foi historicamente barato; acima de 2,4, esticado.',
+}
+
 // Nomes legíveis dos indicadores (o key técnico fica pra lógica).
 export const indicatorName: Record<string, string> = {
   mvrv: 'MVRV Z-Score',
