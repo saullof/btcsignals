@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+/* Dark por padrão, mobile-first. Paleta cripto (verde/vermelho de mercado). */
+:root {
+  --bg: #0a0e17;
+  --bg-2: #0e131e;
+  --card: #131a26;
+  --card-hi: #1a2333;
+  --border: #232d3d;
+  --text: #eaeef6;
+  --muted: #828da3;
+  --buy: #16c784;
+  --sell: #ea3943;
+  --neutral: #6b7688;
+  --btc: #f7931a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #16213a 0%, rgba(22, 33, 58, 0) 55%),
+    var(--bg);
+  background-attachment: fixed;
+  /* respeita notch do iPhone quando instalado como PWA */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.card {
+  background: linear-gradient(180deg, var(--card-hi), var(--card));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.chip {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
