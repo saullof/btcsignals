@@ -5,6 +5,7 @@
 // Fontes 100% sem chave: CBBI (métricas normalizadas + Price desde 2011),
 // Fear&Greed, Binance (preço recente/preciso). BGeometrics fica plugável depois.
 import { createClient } from '@supabase/supabase-js'
+import webpush from 'web-push'
 import {
   percentile,
   signalFromCheapness,
@@ -13,6 +14,7 @@ import {
   decile,
   futureReturns,
 } from '../src/lib/signals.ts'
+import { indicatorName, signalLabel } from '../src/lib/ui.ts'
 import type { Signal } from '../src/lib/types.ts'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
@@ -244,6 +246,7 @@ async function main() {
   if (events.length) {
     const { error } = await db.from('signal_events').insert(events)
     if (error) throw new Error(`insert events: ${error.message}`)
+    await sendPush(events)
   }
 
   const cLatest = compByDate[compByDate.length - 1]
@@ -251,6 +254,48 @@ async function main() {
     `OK. Último dia ${latest}: composto=${cLatest.toFixed(3)} sinal=${compSigNow} ` +
       `indicadores=${latestInds.length} viradas=${events.length}`,
   )
+}
+
+// Frase curta pro corpo da notificação. Consolida várias viradas num push só.
+function summarizeEvents(events: { scope: string; key: string; new_signal: string }[]): string {
+  if (events.length === 1) {
+    const e = events[0]
+    const name = e.scope === 'composite' ? 'Composto' : (indicatorName[e.key] ?? e.key)
+    return `${name} entrou em ${signalLabel[e.new_signal as Signal]}`
+  }
+  const buy = events.filter((e) => e.new_signal === 'buy').length
+  const sell = events.filter((e) => e.new_signal === 'sell').length
+  return `${events.length} sinais mudaram — ${buy} compra, ${sell} venda`
+}
+
+// Envia Web Push só nas viradas, pra cada inscrição ativa. Marca inativa a que
+// expirou (404/410). Se faltar VAPID, apenas registra e segue.
+async function sendPush(events: { scope: string; key: string; new_signal: string }[]) {
+  const subject = process.env.VAPID_SUBJECT
+  const pub = process.env.VAPID_PUBLIC
+  const priv = process.env.VAPID_PRIVATE
+  if (!subject || !pub || !priv) {
+    console.log('VAPID ausente — push pulado.')
+    return
+  }
+  webpush.setVapidDetails(subject, pub, priv)
+  const { data: subs } = await db.from('push_subscriptions').select('*').eq('active', true)
+  if (!subs?.length) {
+    console.log('Sem inscrições ativas.')
+    return
+  }
+  const payload = JSON.stringify({ title: 'BTC Cycle Signals', body: summarizeEvents(events), url: '/' })
+  let sent = 0
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+      sent++
+    } catch (e) {
+      const code = (e as { statusCode?: number }).statusCode
+      if (code === 404 || code === 410) await db.from('push_subscriptions').update({ active: false }).eq('id', s.id)
+    }
+  }
+  console.log(`Push enviado p/ ${sent}/${subs.length} inscrição(ões).`)
 }
 
 main().catch((e) => {
