@@ -50,6 +50,14 @@ export const indicatorName: Record<string, string> = {
 export const fmtUsd = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
+// USD compacto p/ volume: $1.23B, $45.6M, $12K.
+export const fmtCompactUsd = (n: number) => {
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`
+  return `$${Math.round(n)}`
+}
+
 export const pct = (n: number | null | undefined) =>
   n == null ? '—' : `${Math.round(n * 100)}%`
 
