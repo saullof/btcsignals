@@ -1,0 +1,9 @@
+# Worker de ingestão (roda a coleta diária + envia push nas viradas).
+# Serviço separado do frontend. Node 24 executa TypeScript direto (strip-types).
+FROM node:24-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+# Env vars (SUPABASE_URL, SERVICE_ROLE_KEY, VAPID_*) vêm do EasyPanel, não do código.
+CMD ["node", "scripts/scheduler.ts"]
