@@ -8,7 +8,7 @@ import { fmtUsd } from './lib/ui'
 type Tab = 'panel' | 'price' | 'alerts'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'panel', label: 'Painel', icon: '🚦' },
+  { id: 'panel', label: 'Painel', icon: '💻' },
   { id: 'price', label: 'Preço', icon: '📈' },
   { id: 'alerts', label: 'Alertas', icon: '🔔' },
 ]

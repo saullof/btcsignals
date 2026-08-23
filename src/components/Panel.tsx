@@ -17,6 +17,7 @@ export default function Panel() {
   const [indicators, setIndicators] = useState<IndicatorSnapshot[]>([])
   const [state, setState] = useState<'loading' | 'empty' | 'ready' | 'no-db'>('loading')
   const [sel, setSel] = useState<IndicatorSnapshot | null>(null)
+  const [info, setInfo] = useState<{ title: string; body: string } | null>(null)
 
   useEffect(() => {
     if (!supabase) {
@@ -54,22 +55,27 @@ export default function Panel() {
       {/* Hero: gauge do composto + sinal */}
       <section className="card flex flex-col items-center px-4 pt-5 pb-4">
         <div className="flex w-full items-center justify-between text-xs" style={{ color: 'var(--muted)' }}>
-          <span>Composto de ciclo</span>
+          <span className="flex items-center gap-1.5">
+            Composto de ciclo <HelpBtn onClick={() => setInfo(EXPLAIN.composto)} />
+          </span>
           <span className="tabular">{c.date}</span>
         </div>
         <Gauge value={cValue} signal={cSignal} />
         <VotesBar buy={c.votes_buy} sell={c.votes_sell} neutral={c.votes_neutral} />
         <p className="mt-3 text-center text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-          Média de todos os indicadores numa nota de <b>0 (caro/topo)</b> a <b>1 (barato/fundo)</b>.
+          Média da <b>barganha</b> dos 10 indicadores: <b>0 = caro/topo</b>, <b>1 = barato/fundo</b>.
         </p>
       </section>
 
       {/* Probabilidade (base-rates) */}
       <section className="card px-4 py-4">
-        <p className="text-sm font-semibold">Chance histórica de subir</p>
-        <p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>
-          Em dias do passado com o composto na mesma faixa de hoje, com que frequência o preço estava
-          mais alto depois:
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold">Chance histórica de subir</p>
+          <HelpBtn onClick={() => setInfo(EXPLAIN.chance)} />
+        </div>
+        <p className="mt-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+          Nos dias do passado com nota parecida com a de hoje ({cValue.toFixed(2)}), com que frequência
+          o preço estava mais alto depois:
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Prob label="30 dias" p={c.prob_up_30d} n={c.sample_30d} />
@@ -84,7 +90,7 @@ export default function Panel() {
       </section>
 
       {/* Base-rate por consenso */}
-      {c.consensus && <ConsensusCard cons={c.consensus} />}
+      {c.consensus && <ConsensusCard cons={c.consensus} onHelp={() => setInfo(EXPLAIN.consenso)} />}
 
       {/* Grade de indicadores */}
       <div className="flex items-center justify-between px-1">
@@ -100,8 +106,25 @@ export default function Panel() {
       </section>
 
       {sel && <Sheet ind={sel} onClose={() => setSel(null)} />}
+      {info && <InfoSheet title={info.title} body={info.body} onClose={() => setInfo(null)} />}
     </div>
   )
+}
+
+// Explicações em linguagem simples, abertas pelo "?" de cada card.
+const EXPLAIN = {
+  composto: {
+    title: 'Barganha e composto',
+    body: 'Cada indicador vira uma nota de "barganha" de 0 a 100%, comparando o BTC de hoje com a própria história:\n\n• 100% = tão barato quanto nos fundos de ciclo → compra forte.\n• 0% = tão caro quanto nos topos → venda.\n\nO "composto" é a média dessas notas dos 10 indicadores. Hoje ~0.54 = meio-termo (nem barato, nem caro).',
+  },
+  chance: {
+    title: 'Chance histórica de subir',
+    body: 'Pega a nota (composto) de hoje e procura, no histórico desde 2011, todos os dias que tinham nota parecida.\n\nNesses dias, conta em quantos o preço estava MAIS ALTO 30, 90 e 180 dias depois. Esse percentual é a "chance de subir".\n\nn = quantos dias parecidos existiram (quanto maior, mais confiável).\n\nNÃO é previsão. É só a frequência do que já aconteceu em situações parecidas.',
+  },
+  consenso: {
+    title: 'Consenso de compra',
+    body: 'Outra forma de olhar. Em vez da média (composto), conta QUANTOS dos 10 indicadores dizem "compra" ao mesmo tempo.\n\nA ideia: será que quando muitos concordam, a chance melhora? A curva mostra que, no passado, quando ≥30%, ≥50% ou ≥70% estavam em compra, o preço subiu em 90 dias em ~65-67% — quase igual. Ou seja: concordância não é garantia.\n\nHoje isso mede só COMPRA (não venda).',
+  },
 }
 
 function Gauge({ value, signal }: { value: number; signal: Signal }) {
@@ -258,13 +281,16 @@ function Sheet({ ind, onClose }: { ind: IndicatorSnapshot; onClose: () => void }
   )
 }
 
-function ConsensusCard({ cons }: { cons: Consensus }) {
+function ConsensusCard({ cons, onHelp }: { cons: Consensus; onHelp: () => void }) {
   return (
     <section className="card px-4 py-4">
-      <p className="text-sm font-semibold">Consenso de compra</p>
-      <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
-        Hoje: <b style={{ color: 'var(--text)' }}>{cons.buy} de {cons.total}</b> indicadores em compra.
-        Quanto mais concordaram no passado, maior a frequência de alta em 90 dias:
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">Consenso de compra</p>
+        <HelpBtn onClick={onHelp} />
+      </div>
+      <p className="mt-1 text-[11px] leading-snug" style={{ color: 'var(--muted)' }}>
+        Hoje <b style={{ color: 'var(--text)' }}>{cons.buy} de {cons.total}</b> indicadores dizem compra.
+        No passado, quando esta fração de indicadores estava em compra, o preço subiu em 90 dias:
       </p>
       <div className="mt-3 flex flex-col gap-2">
         {cons.curve90.map((r) => (
@@ -288,6 +314,41 @@ function ConsensusCard({ cons }: { cons: Consensus }) {
         ≥50% = pelo menos metade dos indicadores em compra. Amostra pequena; não é conselho financeiro.
       </p>
     </section>
+  )
+}
+
+function HelpBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="O que é isto?"
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+      style={{ background: 'var(--border)', color: 'var(--muted)' }}
+    >
+      ?
+    </button>
+  )
+}
+
+function InfoSheet({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
+      <div className="card relative mx-3 mb-3 w-full max-w-md px-5 pt-4 pb-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full" style={{ background: 'var(--border)' }} />
+        <h3 className="text-base font-bold">{title}</h3>
+        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+          {body}
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-xl py-2.5 text-sm font-semibold"
+          style={{ background: 'var(--card-hi)', color: 'var(--text)', border: '1px solid var(--border)' }}
+        >
+          Entendi
+        </button>
+      </div>
+    </div>
   )
 }
 
