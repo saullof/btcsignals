@@ -38,6 +38,16 @@ function eventToNotif(e: SignalEvent): Notif {
   return { id: `ev-${e.id}`, ts: e.created_at, text, tone: (e.new_signal ?? 'neutral') as Signal }
 }
 
+// Itens dispensados ficam por dispositivo (localStorage) — o histórico é
+// compartilhado no banco, então não apagamos a linha, só escondemos aqui.
+function readDismissed(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem('notif_dismissed') ?? '[]')
+  } catch {
+    return []
+  }
+}
+
 function alertToNotif(a: PriceAlert): Notif {
   const verb = a.direction === 'above' ? 'subiu para' : 'caiu para'
   return {
@@ -71,10 +81,12 @@ export default function Alerts() {
       supabase.from('signal_events').select('*').order('created_at', { ascending: false }).limit(20),
       supabase.from('price_alerts').select('*').not('triggered_at', 'is', null).order('triggered_at', { ascending: false }).limit(20),
     ])
+    const dismissed = readDismissed()
     const items = [
       ...((ev.data ?? []) as SignalEvent[]).map(eventToNotif),
       ...((al.data ?? []) as PriceAlert[]).map(alertToNotif),
     ]
+      .filter((n) => !dismissed.includes(n.id))
       .sort((a, b) => b.ts.localeCompare(a.ts))
       .slice(0, 20)
     setHistory(items)
@@ -157,6 +169,16 @@ export default function Alerts() {
   const openSuggestions = suggestions.filter(
     (s) => !alerts.some((a) => Math.abs(a.target - s.price) / s.price < 0.005),
   )
+
+  const dismissNotif = (id: string) => {
+    setHistory((h) => h.filter((n) => n.id !== id))
+    try {
+      const d = readDismissed()
+      if (!d.includes(id)) localStorage.setItem('notif_dismissed', JSON.stringify([...d, id].slice(-200)))
+    } catch {
+      /* localStorage indisponível — some só nesta sessão */
+    }
+  }
 
   const unread = history.filter((n) => n.ts > lastSeen).length
 
@@ -336,6 +358,14 @@ export default function Alerts() {
                       <div className="text-sm" style={{ color: 'var(--text)' }}>{n.text}</div>
                       <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{ago(n.ts)}</div>
                     </div>
+                    <button
+                      onClick={() => dismissNotif(n.id)}
+                      className="shrink-0 rounded-lg px-2 py-1 text-xs"
+                      style={{ color: 'var(--muted)' }}
+                      aria-label="Remover notificação"
+                    >
+                      ✕
+                    </button>
                   </div>
                 )
               })}
@@ -344,16 +374,6 @@ export default function Alerts() {
         </section>
       )}
 
-      <section className="card px-4 py-4 text-xs" style={{ color: 'var(--muted)' }}>
-        <p className="mb-1 text-sm font-semibold" style={{ color: 'var(--text)' }}>
-          📱 iPhone: para receber push
-        </p>
-        <p className="leading-relaxed">
-          Abra no Safari → botão Compartilhar → <b style={{ color: 'var(--text)' }}>Adicionar à Tela de Início</b>.
-          Push no iOS só funciona com o app instalado, não na aba do Safari.
-        </p>
-      </section>
-
       <button
         onClick={updateApp}
         className="w-full rounded-xl py-2.5 text-sm font-medium"
@@ -361,14 +381,6 @@ export default function Alerts() {
       >
         ↻ Atualizar app
       </button>
-
-      <section
-        className="rounded-2xl px-4 py-3 text-xs leading-relaxed"
-        style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--muted)' }}
-      >
-        Este app é apoio à decisão baseado em frequências históricas de amostra pequena.{' '}
-        <b style={{ color: 'var(--text)' }}>Não é conselho financeiro.</b>
-      </section>
     </div>
   )
 }
