@@ -134,8 +134,8 @@ export default function Alerts() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && onManualAdd()}
                   placeholder="71000"
-                  className="w-full bg-transparent px-2 py-2.5 text-sm tabular outline-none"
-                  style={{ color: 'var(--text)' }}
+                  className="w-full bg-transparent px-2 py-2.5 tabular outline-none"
+                  style={{ color: 'var(--text)', fontSize: 16 }}
                 />
               </div>
               <button
