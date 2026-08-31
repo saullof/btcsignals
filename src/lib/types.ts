@@ -35,3 +35,13 @@ export type CompositeSnapshot = {
 }
 
 export type PricePoint = { date: string; close: number }
+
+export type PriceAlert = {
+  id: number
+  target: number
+  direction: 'above' | 'below'
+  note: string | null
+  active: boolean
+  triggered_at: string | null
+  created_at: string
+}

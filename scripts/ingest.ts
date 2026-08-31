@@ -5,7 +5,6 @@
 // Fontes 100% sem chave: CBBI (métricas normalizadas + Price desde 2011),
 // Fear&Greed, Binance (preço recente/preciso). BGeometrics fica plugável depois.
 import { createClient } from '@supabase/supabase-js'
-import webpush from 'web-push'
 import {
   percentile,
   signalFromCheapness,
@@ -18,6 +17,7 @@ import {
 } from '../src/lib/signals.ts'
 import { indicatorName, signalLabel } from '../src/lib/ui.ts'
 import type { Signal } from '../src/lib/types.ts'
+import { sendToAll } from './push-send.ts'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SERVICE_ROLE_KEY = process.env.SERVICE_ROLE_KEY!
@@ -296,38 +296,9 @@ function summarizeEvents(events: Event[]): string {
   return sorted.length > 1 ? `${top} (+${sorted.length - 1})` : top
 }
 
-// Envia Web Push só nas viradas, pra cada inscrição ativa. Marca inativa a que
-// expirou (404/410). Se faltar VAPID, apenas registra e segue.
+// Envia Web Push só nas viradas. Delega o envio ao módulo compartilhado.
 async function sendPush(events: { scope: string; key: string; new_signal: string }[]) {
-  const subject = process.env.VAPID_SUBJECT
-  const pub = process.env.VAPID_PUBLIC
-  const priv = process.env.VAPID_PRIVATE
-  if (!subject || !pub || !priv) {
-    console.log('VAPID ausente — push pulado.')
-    return
-  }
-  webpush.setVapidDetails(subject, pub, priv)
-  const { data: subs } = await db.from('push_subscriptions').select('*').eq('active', true)
-  if (!subs?.length) {
-    console.log('Sem inscrições ativas.')
-    return
-  }
-  const payload = JSON.stringify({ title: 'BTC Cycle Signals', body: summarizeEvents(events), url: '/' })
-  let sent = 0
-  for (const s of subs) {
-    try {
-      // urgency high: pede entrega imediata (iOS ainda pode atrasar, mas ajuda).
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, {
-        urgency: 'high',
-        TTL: 3600,
-      })
-      sent++
-    } catch (e) {
-      const code = (e as { statusCode?: number }).statusCode
-      if (code === 404 || code === 410) await db.from('push_subscriptions').update({ active: false }).eq('id', s.id)
-    }
-  }
-  console.log(`Push enviado p/ ${sent}/${subs.length} inscrição(ões).`)
+  await sendToAll(db, { title: 'BTC Cycle Signals', body: summarizeEvents(events), url: '/' })
 }
 
 main().catch((e) => {
