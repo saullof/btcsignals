@@ -26,9 +26,16 @@ export default function Alerts() {
 
   const onEnable = async () => {
     setBusy(true)
-    const r = await enablePush()
-    setMsg(r.msg)
-    setBusy(false)
+    setMsg('')
+    try {
+      const r = await enablePush()
+      setMsg(r.msg)
+    } catch (e) {
+      // Sem isso, qualquer exceção (SW não pronto, subscribe falhou) morria calada.
+      setMsg('Erro: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const loadAlerts = async () => {
