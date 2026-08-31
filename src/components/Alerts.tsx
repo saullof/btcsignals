@@ -3,8 +3,8 @@ import { enablePush } from '../lib/push'
 import { supabase } from '../lib/supabase'
 import { useBtcPrice } from '../hooks/useBtcPrice'
 import { suggestLevels } from '../lib/levels'
-import { fmtUsd } from '../lib/ui'
-import type { PriceAlert } from '../lib/types'
+import { fmtUsd, indicatorName, signalLabel } from '../lib/ui'
+import type { PriceAlert, SignalEvent, Signal } from '../lib/types'
 
 // Busca o SW novo e recarrega — garante pegar o último deploy sem reinstalar.
 async function updateApp() {
@@ -16,6 +16,38 @@ async function updateApp() {
   }
 }
 
+type Notif = { id: string; ts: string; text: string; tone: Signal | 'price' }
+
+// Tempo relativo curto em pt: "agora", "há 3h", "há 2d".
+function ago(iso: string): string {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000
+  if (s < 60) return 'agora'
+  if (s < 3600) return `há ${Math.floor(s / 60)}min`
+  if (s < 86400) return `há ${Math.floor(s / 3600)}h`
+  return `há ${Math.floor(s / 86400)}d`
+}
+
+function eventToNotif(e: SignalEvent): Notif {
+  const side = signalLabel[(e.new_signal ?? 'neutral') as Signal]
+  const text =
+    e.scope === 'consensus'
+      ? `🔥 5+ indicadores em ${side}`
+      : e.scope === 'composite'
+        ? `Composto entrou em zona de ${side}`
+        : `${indicatorName[e.key] ?? e.key} entrou em ${side}`
+  return { id: `ev-${e.id}`, ts: e.created_at, text, tone: (e.new_signal ?? 'neutral') as Signal }
+}
+
+function alertToNotif(a: PriceAlert): Notif {
+  const verb = a.direction === 'above' ? 'subiu para' : 'caiu para'
+  return {
+    id: `al-${a.id}`,
+    ts: a.triggered_at!,
+    text: `🎯 BTC ${verb} ${fmtUsd(a.target)}${a.note ? ` — ${a.note}` : ''}`,
+    tone: 'price',
+  }
+}
+
 export default function Alerts() {
   const [msg, setMsg] = useState<string>('')
   const [busy, setBusy] = useState(false)
@@ -23,6 +55,37 @@ export default function Alerts() {
   const [alerts, setAlerts] = useState<PriceAlert[]>([])
   const [closes, setCloses] = useState<number[]>([])
   const [input, setInput] = useState('')
+  const [history, setHistory] = useState<Notif[]>([])
+  const [lastSeen, setLastSeen] = useState<string>('')
+
+  const loadHistory = async () => {
+    if (!supabase) return
+    let prev = ''
+    try {
+      prev = localStorage.getItem('notif_last_seen') ?? ''
+    } catch {
+      /* modo privado bloqueia localStorage — segue sem "novo" */
+    }
+    setLastSeen(prev)
+    const [ev, al] = await Promise.all([
+      supabase.from('signal_events').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('price_alerts').select('*').not('triggered_at', 'is', null).order('triggered_at', { ascending: false }).limit(20),
+    ])
+    const items = [
+      ...((ev.data ?? []) as SignalEvent[]).map(eventToNotif),
+      ...((al.data ?? []) as PriceAlert[]).map(alertToNotif),
+    ]
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, 20)
+    setHistory(items)
+    if (items.length) {
+      try {
+        localStorage.setItem('notif_last_seen', items[0].ts)
+      } catch {
+        /* idem */
+      }
+    }
+  }
 
   const onEnable = async () => {
     setBusy(true)
@@ -50,6 +113,7 @@ export default function Alerts() {
 
   useEffect(() => {
     loadAlerts()
+    loadHistory()
     if (!supabase) return
     ;(async () => {
       const { data } = await supabase
@@ -93,6 +157,8 @@ export default function Alerts() {
   const openSuggestions = suggestions.filter(
     (s) => !alerts.some((a) => Math.abs(a.target - s.price) / s.price < 0.005),
   )
+
+  const unread = history.filter((n) => n.ts > lastSeen).length
 
   return (
     <div className="flex flex-col gap-4 pt-1">
@@ -234,6 +300,49 @@ export default function Alerts() {
           </>
         )}
       </section>
+
+      {/* Histórico de notificações */}
+      {supabase && (
+        <section className="card px-4 py-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold">Histórico</h2>
+            {unread > 0 && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                style={{ background: 'var(--btc)', color: '#0a0e17' }}
+              >
+                {unread} novo{unread > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          {history.length === 0 ? (
+            <p className="mt-2 text-xs" style={{ color: 'var(--muted)' }}>
+              Nenhuma notificação ainda.
+            </p>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2">
+              {history.map((n) => {
+                const isNew = n.ts > lastSeen
+                const dot =
+                  n.tone === 'price' ? 'var(--btc)' : n.tone === 'buy' ? 'var(--buy)' : n.tone === 'sell' ? 'var(--sell)' : 'var(--neutral)'
+                return (
+                  <div
+                    key={n.id}
+                    className="flex items-start gap-2 rounded-xl px-3 py-2.5"
+                    style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}
+                  >
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: isNew ? dot : 'transparent', border: isNew ? 'none' : '1px solid var(--border)' }} />
+                    <div className="flex-1">
+                      <div className="text-sm" style={{ color: 'var(--text)' }}>{n.text}</div>
+                      <div className="text-[11px]" style={{ color: 'var(--muted)' }}>{ago(n.ts)}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="card px-4 py-4 text-xs" style={{ color: 'var(--muted)' }}>
         <p className="mb-1 text-sm font-semibold" style={{ color: 'var(--text)' }}>
