@@ -19,12 +19,20 @@ self.addEventListener('push', (event) => {
     d = { body: event.data?.text() }
   }
   event.waitUntil(
-    self.registration.showNotification(d.title ?? 'BTC Cycle Signals', {
-      body: d.body ?? '',
-      icon: '/icons/icon.svg',
-      badge: '/icons/icon.svg',
-      data: { url: d.url ?? '/' },
-    }),
+    (async () => {
+      await self.registration.showNotification(d.title ?? 'BTC Cycle Signals', {
+        body: d.body ?? '',
+        icon: '/icons/icon.svg',
+        badge: '/icons/icon.svg',
+        data: { url: d.url ?? '/' },
+      })
+      // Badge no ícone do app = nº de notificações ainda na bandeja. Limpa ao abrir.
+      const setBadge = (self.navigator as unknown as { setAppBadge?: (n: number) => Promise<void> }).setAppBadge
+      if (setBadge) {
+        const pending = await self.registration.getNotifications()
+        await setBadge(pending.length).catch(() => {})
+      }
+    })(),
   )
 })
 

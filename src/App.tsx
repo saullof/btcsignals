@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Panel from './components/Panel'
 import Price from './components/Price'
 import Alerts from './components/Alerts'
@@ -16,6 +16,12 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 export default function App() {
   const [tab, setTab] = useState<Tab>('panel')
   const ticker = useBtcPrice()
+
+  // Abrir o app = "vi as notificações": zera o badge do ícone.
+  useEffect(() => {
+    const clear = (navigator as unknown as { clearAppBadge?: () => Promise<void> }).clearAppBadge
+    clear?.().catch(() => {})
+  }, [])
   const up = (ticker?.changePct ?? 0) >= 0
 
   return (
