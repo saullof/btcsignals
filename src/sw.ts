@@ -6,6 +6,10 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: str
 
 precacheAndRoute(self.__WB_MANIFEST)
 
+// Ativa a versão nova imediatamente (senão o iOS segura o SW até fechar o app).
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+
 // Push só chega quando há virada de estado (a Edge Function decide isso).
 self.addEventListener('push', (event) => {
   let d: { title?: string; body?: string; url?: string } = {}

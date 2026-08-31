@@ -6,6 +6,16 @@ import { suggestLevels } from '../lib/levels'
 import { fmtUsd } from '../lib/ui'
 import type { PriceAlert } from '../lib/types'
 
+// Busca o SW novo e recarrega — garante pegar o último deploy sem reinstalar.
+async function updateApp() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    await reg?.update()
+  } finally {
+    location.reload()
+  }
+}
+
 export default function Alerts() {
   const [msg, setMsg] = useState<string>('')
   const [busy, setBusy] = useState(false)
@@ -227,6 +237,14 @@ export default function Alerts() {
           Push no iOS só funciona com o app instalado, não na aba do Safari.
         </p>
       </section>
+
+      <button
+        onClick={updateApp}
+        className="w-full rounded-xl py-2.5 text-sm font-medium"
+        style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)' }}
+      >
+        ↻ Atualizar app
+      </button>
 
       <section
         className="rounded-2xl px-4 py-3 text-xs leading-relaxed"
