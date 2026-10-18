@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Panel from './components/Panel'
 import Chances from './components/Chances'
+import Seasonality from './components/Seasonality'
 import Price from './components/Price'
 import Alerts from './components/Alerts'
 import { useBtcPrice } from './hooks/useBtcPrice'
@@ -51,6 +52,7 @@ export default function App() {
         {tab === 'panel' && (
           <div className="flex flex-col gap-4 pt-1">
             <Chances />
+            <Seasonality />
             <Panel />
           </div>
         )}
