@@ -19,7 +19,7 @@ import type { ConsensusRate } from '../lib/types'
 export default function Panel() {
   const [composite, setComposite] = useState<CompositeSnapshot | null>(null)
   const [indicators, setIndicators] = useState<IndicatorSnapshot[]>([])
-  const [state, setState] = useState<'loading' | 'empty' | 'ready' | 'no-db'>('loading')
+  const [state, setState] = useState<'loading' | 'empty' | 'ready' | 'no-db' | 'error'>('loading')
   const [sel, setSel] = useState<IndicatorSnapshot | null>(null)
   const [info, setInfo] = useState<{ title: string; body: string } | null>(null)
 
@@ -29,12 +29,17 @@ export default function Panel() {
       return
     }
     ;(async () => {
-      const { data: comp } = await supabase
+      const { data: comp, error } = await supabase
         .from('composite_snapshots')
         .select('*')
         .order('date', { ascending: false })
         .limit(1)
         .maybeSingle()
+      // Erro = banco fora do ar/inacessível, não "sem dados". Mensagens distintas.
+      if (error) {
+        setState('error')
+        return
+      }
       if (!comp) {
         setState('empty')
         return
@@ -48,6 +53,7 @@ export default function Panel() {
 
   if (state === 'no-db') return <Notice text="Supabase não configurado. Preencha .env (etapa 2)." />
   if (state === 'loading') return <Notice text="Carregando…" />
+  if (state === 'error') return <Notice text="Banco de dados indisponível no momento. Tente de novo em alguns minutos." />
   if (state === 'empty') return <Notice text="Sem snapshots ainda. Rode a ingestão (etapas 3–4)." />
 
   const c = composite!
