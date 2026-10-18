@@ -3,6 +3,7 @@ import { enablePush } from '../lib/push'
 import { supabase } from '../lib/supabase'
 import { useBtcPrice } from '../hooks/useBtcPrice'
 import { suggestLevels } from '../lib/levels'
+import { createPriceAlert } from '../lib/alerts'
 import { fmtUsd, indicatorName, signalLabel } from '../lib/ui'
 import type { PriceAlert, SignalEvent, Signal } from '../lib/types'
 
@@ -140,9 +141,7 @@ export default function Alerts() {
   const price = ticker?.price ?? null
 
   const addAlert = async (target: number, direction: 'above' | 'below', note: string | null) => {
-    if (!supabase || !Number.isFinite(target)) return
-    const { error } = await supabase.from('price_alerts').insert({ target, direction, note })
-    if (!error) {
+    if ((await createPriceAlert(target, direction, note)).ok) {
       setInput('')
       loadAlerts()
     }
