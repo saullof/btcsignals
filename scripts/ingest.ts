@@ -18,6 +18,7 @@ import {
 import { indicatorName, signalLabel } from '../src/lib/ui.ts'
 import type { Signal } from '../src/lib/types.ts'
 import { sendToAll } from './push-send.ts'
+import { fetchBinanceDaily } from './binance.ts'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SERVICE_ROLE_KEY = process.env.SERVICE_ROLE_KEY!
@@ -59,20 +60,9 @@ function seriesToMap(series: Record<string, number>): Map<string, number> {
   return m
 }
 
-// Klines diários da Binance, paginado desde 2017 até hoje.
+// Fechamentos diários da Binance desde 2017 (data -> close).
 async function fetchBinanceCloses(): Promise<Map<string, number>> {
-  const out = new Map<string, number>()
-  let start = 0
-  for (let guard = 0; guard < 30; guard++) {
-    const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=1000${start ? `&startTime=${start}` : ''}`
-    const k: any[] = await fetchJson(url)
-    if (!k.length) break
-    for (const c of k) out.set(tsToDate(Number(c[0]) / 1000), Number(c[4]))
-    const lastOpen = Number(k[k.length - 1][0])
-    if (k.length < 1000) break
-    start = lastOpen + 86_400_000 // próximo dia
-  }
-  return out
+  return new Map((await fetchBinanceDaily()).map((k) => [k.date, k.close]))
 }
 
 async function chunkUpsert(table: string, rows: any[], conflict: string, size = 1000) {

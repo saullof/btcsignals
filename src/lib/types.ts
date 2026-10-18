@@ -36,6 +36,9 @@ export type CompositeSnapshot = {
 
 export type PricePoint = { date: string; close: number }
 
+// Candle diário (Binance). date = YYYY-MM-DD (UTC).
+export type Ohlc = { date: string; open: number; high: number; low: number; close: number }
+
 export type SignalEvent = {
   id: number
   date: string
