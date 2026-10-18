@@ -98,6 +98,40 @@ export function buildModel(samples: TouchSample[], knownBefore = Infinity): Touc
   return model
 }
 
+export type CalBucket = { pred: number; obs: number; n: number }
+export type Calibration = { buckets: CalBucket[]; mae: number }
+
+const CAL_Z = [0.5, 1, 1.5, 2]
+
+// Walk-forward: em cada dia de teste, monta a curva só com resultados já
+// conhecidos naquele dia, prevê P(tocar) em alguns z e confere o que aconteceu.
+// Agrupa por decil de previsão; mae = |previsto − observado| médio ponderado.
+export function calibrate(samples: TouchSample[], h: Horizon, warmup = 730, step = 5): Calibration {
+  const acc = Array.from({ length: 10 }, () => ({ pred: 0, hit: 0, n: 0 }))
+  for (let t = warmup; t < samples.length; t += step) {
+    const s = samples[t]
+    const out = s.exc[h]
+    if (!out) continue
+    const known = samples.filter((x) => x.exc[h] && x.i + h < s.i)
+    const same = known.filter((x) => x.regime === s.regime)
+    const pool = same.length >= MIN_REGIME_N ? same : known
+    for (const dir of ['up', 'down'] as const) {
+      const curve = survival(pool.map((x) => x.exc[h]![dir]))
+      for (const z of CAL_Z) {
+        const pred = probAt(curve, z)
+        const b = acc[Math.min(9, Math.floor(pred * 10))]
+        b.pred += pred
+        b.hit += out[dir] >= z ? 1 : 0
+        b.n++
+      }
+    }
+  }
+  const buckets = acc.filter((b) => b.n).map((b) => ({ pred: b.pred / b.n, obs: b.hit / b.n, n: b.n }))
+  const total = buckets.reduce((a, b) => a + b.n, 0)
+  const mae = total ? buckets.reduce((a, b) => a + Math.abs(b.pred - b.obs) * b.n, 0) / total : 0
+  return { buckets, mae }
+}
+
 // Curva do regime atual, ou a geral se o regime tem poucas amostras.
 export function curveFor(model: TouchModel, h: Horizon, dir: 'up' | 'down', regime: Regime): TouchCurve {
   const c = model[h][dir][regime]
