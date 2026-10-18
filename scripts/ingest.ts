@@ -19,6 +19,7 @@ import { indicatorName, signalLabel } from '../src/lib/ui.ts'
 import type { Signal } from '../src/lib/types.ts'
 import { sendToAll } from './push-send.ts'
 import { fetchBinanceDaily } from './binance.ts'
+import { CBBI_INDICATORS, tsToDate, fetchJson, seriesToMap } from './sources.ts'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SERVICE_ROLE_KEY = process.env.SERVICE_ROLE_KEY!
@@ -28,37 +29,8 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 }
 const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 
-// Indicadores vindos do CBBI (já 0..1, alto = topo => cheapness = 1 - valor).
-const CBBI_INDICATORS: { key: string; cbbi: string }[] = [
-  { key: 'mvrv', cbbi: 'MVRV' },
-  { key: 'puell', cbbi: 'Puell' },
-  { key: 'rhodl', cbbi: 'RHODL' },
-  { key: 'rupl', cbbi: 'RUPL' },
-  { key: 'reserve_risk', cbbi: 'ReserveRisk' },
-  { key: 'pi_cycle', cbbi: 'PiCycle' },
-  { key: '2y_ma', cbbi: '2YMA' },
-  { key: 'cbbi', cbbi: 'Confidence' },
-]
-
+// CBBI: valores já 0..1, alto = topo => cheapness = 1 - valor.
 type DayInd = { key: string; raw: number; cheap: number; signal: Signal; source: string }
-
-const tsToDate = (unixSec: string | number): string =>
-  new Date(Number(unixSec) * 1000).toISOString().slice(0, 10)
-
-async function fetchJson(url: string): Promise<any> {
-  const r = await fetch(url)
-  if (!r.ok) throw new Error(`${url} -> ${r.status}`)
-  return r.json()
-}
-
-// Série CBBI {unixSec: valor} -> Map<dateStr, número>.
-function seriesToMap(series: Record<string, number>): Map<string, number> {
-  const m = new Map<string, number>()
-  for (const [ts, v] of Object.entries(series)) {
-    if (v != null && Number.isFinite(v)) m.set(tsToDate(ts), v)
-  }
-  return m
-}
 
 // Fechamentos diários da Binance desde 2017 (data -> close).
 async function fetchBinanceCloses(): Promise<Map<string, number>> {

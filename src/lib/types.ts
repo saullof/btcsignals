@@ -49,6 +49,16 @@ export type DecisionSnapshot = {
   calibration: Record<7 | 30, import('./touch').Calibration>
   levels: import('./levels').LevelCandidate[]
   monthly: import('./seasonality').MonthlyReturn[]
+  // Fase 2 (opcionais: snapshots antigos não têm).
+  indicators?: IndicatorWeight[]
+  piCycle?: { ratio: number } | null
+}
+
+export type IndicatorWeight = {
+  key: string
+  group: 'ciclo' | 'curto'
+  value: number
+  w: Record<7 | 30, import('./weights').HorizonWeight>
 }
 
 export type SignalEvent = {
