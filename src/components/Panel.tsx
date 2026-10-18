@@ -374,7 +374,7 @@ function ConsRow({
   )
 }
 
-function HelpBtn({ onClick }: { onClick: () => void }) {
+export function HelpBtn({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -387,7 +387,7 @@ function HelpBtn({ onClick }: { onClick: () => void }) {
   )
 }
 
-function InfoSheet({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
+export function InfoSheet({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-20 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />

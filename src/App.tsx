@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Panel from './components/Panel'
+import Chances from './components/Chances'
 import Price from './components/Price'
 import Alerts from './components/Alerts'
 import { useBtcPrice } from './hooks/useBtcPrice'
@@ -47,7 +48,12 @@ export default function App() {
       </header>
 
       <main className="flex-1 px-4 pb-28">
-        {tab === 'panel' && <Panel />}
+        {tab === 'panel' && (
+          <div className="flex flex-col gap-4 pt-1">
+            <Chances />
+            <Panel />
+          </div>
+        )}
         {tab === 'price' && <Price />}
         {tab === 'alerts' && <Alerts />}
       </main>
