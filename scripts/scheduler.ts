@@ -11,10 +11,14 @@ function run(script: string) {
   p.on('exit', (code) => console.log(new Date().toISOString(), `${script} saiu (code ${code})`))
 }
 
-// Ingestão completa: 1x na subida + a cada 24h.
-console.log(new Date().toISOString(), '→ rodando ingestão…')
-run('scripts/ingest.ts')
-setInterval(() => run('scripts/ingest.ts'), DAY) // ponytail: intervalo simples de 24h; troca por cron se precisar horário fixo
+// Ingestão completa + snapshot do painel de decisão: 1x na subida + a cada 24h.
+const daily = () => {
+  console.log(new Date().toISOString(), '→ rodando ingestão e snapshot de decisão…')
+  run('scripts/ingest.ts')
+  run('scripts/decision.ts')
+}
+daily()
+setInterval(daily, DAY) // ponytail: intervalo simples de 24h; troca por cron se precisar horário fixo
 
 // Alarmes de preço: loop leve só de preço vivo + push.
 run('scripts/check-alerts.ts')

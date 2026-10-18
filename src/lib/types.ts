@@ -39,6 +39,18 @@ export type PricePoint = { date: string; close: number }
 // Candle diário (Binance). date = YYYY-MM-DD (UTC).
 export type Ohlc = { date: string; open: number; high: number; low: number; close: number }
 
+// Payload de decision_snapshot (gerado por scripts/decision.ts, lido pelo app).
+export type DecisionSnapshot = {
+  date: string
+  close: number
+  sigma: number
+  regime: import('./touch').Regime
+  model: import('./touch').TouchModel
+  calibration: Record<7 | 30, import('./touch').Calibration>
+  levels: import('./levels').LevelCandidate[]
+  monthly: import('./seasonality').MonthlyReturn[]
+}
+
 export type SignalEvent = {
   id: number
   date: string
