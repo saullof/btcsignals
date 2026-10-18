@@ -31,6 +31,13 @@ export const indicatorDesc: Record<string, string> = {
   cbbi: 'Índice que junta ~9 métricas num só número (0–100) de "quão perto do topo estamos". Entra como um composto independente.',
   fng: 'Termômetro de sentimento (0–100). É contrário: medo extremo costuma ser compra; ganância extrema, venda.',
   mayer: 'Preço dividido pela média de 200 dias. Abaixo de 0,8 foi historicamente barato; acima de 2,4, esticado.',
+  rsi: 'Força do movimento recente (0–100), pelas últimas 14 velas diárias. Acima de 70 = subiu rápido demais; abaixo de 30 = caiu rápido demais.',
+  ema21: 'Quanto o preço está acima ou abaixo da média exponencial de 21 dias (a tendência de curto prazo).',
+  ema50: 'Quanto o preço está acima ou abaixo da média exponencial de 50 dias (a tendência de médio prazo).',
+  ret30: 'Quanto o BTC subiu ou caiu nos últimos 30 dias (momentum).',
+  vol20: 'Quanto o preço oscila por dia, em média, nos últimos 20 dias. Volatilidade alta costuma vir com movimentos grandes para qualquer lado.',
+  pctb: 'Onde o preço está dentro das bandas de Bollinger: 0% = na banda de baixo, 100% = na banda de cima.',
+  funding: 'Taxa que quem está alavancado comprado paga a quem está vendido (média de 7 dias). Muito alta = muita gente apostando na alta com dinheiro emprestado.',
 }
 
 // Nomes legíveis dos indicadores (o key técnico fica pra lógica).
@@ -45,6 +52,13 @@ export const indicatorName: Record<string, string> = {
   cbbi: 'CBBI Confidence',
   fng: 'Fear & Greed',
   mayer: 'Mayer Multiple',
+  rsi: 'RSI (14)',
+  ema21: 'Distância da EMA 21',
+  ema50: 'Distância da EMA 50',
+  ret30: 'Retorno de 30 dias',
+  vol20: 'Volatilidade (20d)',
+  pctb: 'Posição nas bandas (%B)',
+  funding: 'Funding (7d)',
 }
 
 export const fmtUsd = (n: number) =>

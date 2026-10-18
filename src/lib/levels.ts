@@ -116,7 +116,7 @@ export function suggestLevels(closes: number[], current: number): Suggestion[] {
   // descarta o que está praticamente no preço (<0,2%).
   const sug: Suggestion[] = cand
     .filter((c) => c.price > 0 && Math.abs(c.price - current) / current > 0.002)
-    .map((c) => ({
+    .map((c): Suggestion => ({
       price: c.price,
       label: c.label,
       kind: c.price < current ? 'support' : 'resistance',

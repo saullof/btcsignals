@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { signalFromCheapness } from '../lib/signals'
-import type { CompositeSnapshot, Consensus, IndicatorSnapshot, Signal } from '../lib/types'
+import type { CompositeSnapshot, Consensus, Signal } from '../lib/types'
 import {
   signalColor,
   signalLabel,
   signalTint,
-  indicatorName,
-  indicatorDesc,
   pct,
-  fmtRaw,
   zonaFromComposite,
   probPhrase,
   toneEmoji,
@@ -18,9 +15,7 @@ import type { ConsensusRate } from '../lib/types'
 
 export default function Panel() {
   const [composite, setComposite] = useState<CompositeSnapshot | null>(null)
-  const [indicators, setIndicators] = useState<IndicatorSnapshot[]>([])
   const [state, setState] = useState<'loading' | 'empty' | 'ready' | 'no-db' | 'error'>('loading')
-  const [sel, setSel] = useState<IndicatorSnapshot | null>(null)
   const [info, setInfo] = useState<{ title: string; body: string } | null>(null)
 
   useEffect(() => {
@@ -44,9 +39,7 @@ export default function Panel() {
         setState('empty')
         return
       }
-      const { data: inds } = await supabase.from('indicator_snapshots').select('*').eq('date', comp.date)
       setComposite(comp)
-      setIndicators(sortInds(inds ?? []))
       setState('ready')
     })()
   }, [])
@@ -105,20 +98,6 @@ export default function Panel() {
       {/* Base-rate por consenso */}
       {c.consensus && <ConsensusCard cons={c.consensus} onHelp={() => setInfo(EXPLAIN.consenso)} />}
 
-      {/* Grade de indicadores */}
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold">Indicadores</h2>
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>
-          toque para explicar
-        </span>
-      </div>
-      <section className="grid grid-cols-2 gap-3">
-        {indicators.map((i) => (
-          <IndicatorCard key={i.indicator_key} ind={i} onClick={() => setSel(i)} />
-        ))}
-      </section>
-
-      {sel && <Sheet ind={sel} onClose={() => setSel(null)} />}
       {info && <InfoSheet title={info.title} body={info.body} onClose={() => setInfo(null)} />}
     </div>
   )
@@ -224,75 +203,6 @@ function Prob({ label, p, n }: { label: string; p: number | null; n: number | nu
   )
 }
 
-function IndicatorCard({ ind, onClick }: { ind: IndicatorSnapshot; onClick: () => void }) {
-  const barganha = ind.cheapness ?? 0
-  const color = signalColor[ind.signal]
-  return (
-    <button onClick={onClick} className="card p-3 text-left">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-[13px] font-semibold leading-tight">
-          {indicatorName[ind.indicator_key] ?? ind.indicator_key}
-        </span>
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color, marginTop: 4 }} />
-      </div>
-      <div className="mt-1 flex items-baseline justify-between">
-        <span className="chip px-2 py-0.5 text-[10px]" style={{ background: signalTint[ind.signal], color }}>
-          {signalLabel[ind.signal]}
-        </span>
-        <span className="text-[11px] tabular" style={{ color: 'var(--muted)' }}>
-          {fmtRaw(ind.raw_value)}
-        </span>
-      </div>
-      {/* barra "barganha": 0 = caro/topo, 1 = barato/fundo */}
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--border)' }}>
-        <div className="h-full rounded-full" style={{ width: `${Math.round(barganha * 100)}%`, background: color }} />
-      </div>
-      <div className="mt-1 flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
-        <span>caro</span>
-        <span>barganha {pct(barganha)}</span>
-        <span>barato</span>
-      </div>
-    </button>
-  )
-}
-
-// Bottom sheet com a explicação do indicador tocado.
-function Sheet({ ind, onClose }: { ind: IndicatorSnapshot; onClose: () => void }) {
-  const color = signalColor[ind.signal]
-  return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
-      <div
-        className="card relative mx-3 mb-3 w-full max-w-md px-5 pt-4 pb-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full" style={{ background: 'var(--border)' }} />
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold">{indicatorName[ind.indicator_key] ?? ind.indicator_key}</h3>
-          <span className="chip px-2.5 py-1 text-[11px]" style={{ background: signalTint[ind.signal], color }}>
-            {signalLabel[ind.signal]}
-          </span>
-        </div>
-        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
-          {indicatorDesc[ind.indicator_key] ?? 'Sem descrição.'}
-        </p>
-        <div className="mt-4 flex justify-between text-xs" style={{ color: 'var(--muted)' }}>
-          <span>
-            barganha agora: <b style={{ color }}>{pct(ind.cheapness)}</b>
-          </span>
-          <span>valor: {fmtRaw(ind.raw_value)}</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="mt-5 w-full rounded-xl py-2.5 text-sm font-semibold"
-          style={{ background: 'var(--card-hi)', color: 'var(--text)', border: '1px solid var(--border)' }}
-        >
-          Fechar
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function Resumo({ c }: { c: CompositeSnapshot }) {
   const cv = c.composite ?? 0
@@ -414,13 +324,5 @@ function Notice({ text }: { text: string }) {
     <div className="card px-6 py-10 text-center text-sm" style={{ color: 'var(--muted)' }}>
       {text}
     </div>
-  )
-}
-
-// Ordena: sinais de compra primeiro, depois venda, depois neutro; barganha desc.
-function sortInds(inds: IndicatorSnapshot[]): IndicatorSnapshot[] {
-  const rank: Record<Signal, number> = { buy: 0, sell: 1, neutral: 2 }
-  return [...inds].sort(
-    (a, b) => rank[a.signal] - rank[b.signal] || (b.cheapness ?? 0) - (a.cheapness ?? 0),
   )
 }
